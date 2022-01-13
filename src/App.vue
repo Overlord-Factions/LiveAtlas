@@ -89,12 +89,16 @@ export default defineComponent({
 				} catch(e: any) {
 					// Don't retry if request was aborted or logging in is required
 					if(!(e instanceof DOMException && e.name === 'AbortError') && !loginRequired.value) {
-						const error = `Failed to load server configuration for '${store.state.currentServer!.id}'`;
-						console.error(`${error}:`, e);
+						var error = `Failed to load the server map`;
 						showSplashError(`${error}\n${e}`, false, ++loadingAttempts.value);
 
 						clearTimeout(Number(loadingTimeout));
-						loadingTimeout = setTimeout(() => loadConfiguration(), 1000);
+						if(loadingAttempts.value >= 20) {
+						  showSplashError(`${error}\n${e}\nMaximum attempts reached, refresh the page`, false, loadingAttempts.value);
+						  loading.value = false;
+						  return;
+						}
+						loadingTimeout = setTimeout(() => loadConfiguration(), 75);
 					}
 				} finally {
 					loading.value = false;
