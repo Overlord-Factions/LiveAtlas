@@ -98,7 +98,7 @@ export default defineComponent({
 						  loading.value = false;
 						  return;
 						}
-						loadingTimeout = setTimeout(() => loadConfiguration(), 75);
+						loadingTimeout = setTimeout(() => loadConfiguration(), 750);
 					}
 				} finally {
 					loading.value = false;
