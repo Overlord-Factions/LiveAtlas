@@ -23,25 +23,25 @@ import LiveAtlasPolygon from "@/leaflet/vector/LiveAtlasPolygon";
 import {Coordinate, LiveAtlasAreaMarker} from "@/index";
 import {arePointsEqual, createPopup, isStyleEqual, tooltipOptions} from "@/util/paths";
 
-export const createArea = (options: LiveAtlasAreaMarker, converter: Function): LiveAtlasPolyline | LiveAtlasPolygon => {
+export const createAreaLayer = (options: LiveAtlasAreaMarker, converter: Function): LiveAtlasPolyline | LiveAtlasPolygon => {
 	const outline = !options.style.fillOpacity || (options.style.fillOpacity <= 0),
 		points = options.points.map(projectPointsMapCallback, converter) as LatLngExpression[] | LatLngExpression[][],
 		area = outline ? new LiveAtlasPolyline(points, options) : new LiveAtlasPolygon(points, options);
 
-	if (options.popupContent) {
+	if (options.popup) {
 		area.bindPopup(() => createPopup(options, 'AreaPopup'));
 	}
 
-	if (options.tooltipContent) {
-		area.bindTooltip(() => options.tooltipContent as string, tooltipOptions);
+	if (options.tooltip) {
+		area.bindTooltip(() => options.tooltipHTML || options.tooltip, tooltipOptions);
 	}
 
 	return area;
 };
 
-export const updateArea = (area: LiveAtlasPolyline | LiveAtlasPolygon | undefined, options: LiveAtlasAreaMarker, converter: Function): LiveAtlasPolyline | LiveAtlasPolygon => {
+export const updateAreaLayer = (area: LiveAtlasPolyline | LiveAtlasPolygon | undefined, options: LiveAtlasAreaMarker, converter: Function): LiveAtlasPolyline | LiveAtlasPolygon => {
 	if (!area) {
-		return createArea(options, converter);
+		return createAreaLayer(options, converter);
 	}
 
 	const points = options.points.map(projectPointsMapCallback, converter) as LatLngExpression[] | LatLngExpression[][],
@@ -62,7 +62,16 @@ export const updateArea = (area: LiveAtlasPolyline | LiveAtlasPolygon | undefine
 
 	area.closePopup();
 	area.unbindPopup();
-	area.bindPopup(() => createPopup(options, 'AreaPopup'));
+	area.closeTooltip();
+	area.unbindTooltip();
+
+	if (options.popup) {
+		area.bindPopup(() => createPopup(options, 'AreaPopup'));
+	}
+
+	if (options.tooltip) {
+		area.bindTooltip(() => options.tooltipHTML || options.tooltip, tooltipOptions);
+	}
 
 	if(dirty) {
 		area.redraw();

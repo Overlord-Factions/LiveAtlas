@@ -14,31 +14,44 @@
  * limitations under the License.
  */
 
-import {DynmapMarkerSetUpdates, DynmapTileUpdate, DynmapUpdate} from "@/dynmap";
+import {DynmapMarkerSetUpdate, DynmapMarkerUpdate, DynmapTileUpdate} from "@/dynmap";
 import {
 	LiveAtlasAreaMarker,
 	LiveAtlasChat,
 	LiveAtlasCircleMarker,
 	LiveAtlasComponentConfig,
 	LiveAtlasDimension,
-	LiveAtlasLineMarker,
-	LiveAtlasPointMarker, LiveAtlasPlayerImageSize,
+	LiveAtlasLineMarker, LiveAtlasMarker,
+	LiveAtlasPlayerImageSize,
+	LiveAtlasPointMarker,
 	LiveAtlasServerConfig,
 	LiveAtlasServerMessageConfig,
 	LiveAtlasWorldDefinition
 } from "@/index";
 import {getPoints} from "@/util/areas";
-import {decodeHTMLEntities, endWorldNameRegex, netherWorldNameRegex, titleColoursRegex} from "@/util";
+import {
+	decodeHTMLEntities,
+	endWorldNameRegex,
+	getMiddle,
+	netherWorldNameRegex,
+	stripHTML,
+	titleColoursRegex
+} from "@/util";
 import {getLinePoints} from "@/util/lines";
 import LiveAtlasMapDefinition from "@/model/LiveAtlasMapDefinition";
 import {
 	Configuration,
-	Marker, MarkerArea, MarkerCircle, MarkerLine, MarkerSet,
+	Marker,
+	MarkerArea,
+	MarkerCircle,
+	MarkerLine,
+	MarkerSet,
 	Options,
 	WorldConfiguration,
 	WorldMapConfiguration
 } from "dynmap";
 import {PointTuple} from "leaflet";
+import {LiveAtlasMarkerType} from "@/util/markers";
 
 export function buildServerConfig(response: Options): LiveAtlasServerConfig {
 	let title = 'Dynmap';
@@ -267,21 +280,20 @@ export function buildMarkerSet(id: string, data: MarkerSet): any {
 	}
 }
 
-export function buildMarkers(data: any): Map<string, LiveAtlasPointMarker> {
-	const markers = Object.freeze(new Map()) as Map<string, LiveAtlasPointMarker>;
+export function buildMarkers(data: any, list: Map<string, LiveAtlasMarker>): void {
+	let id;
 
 	for (const key in data) {
 		if (!Object.prototype.hasOwnProperty.call(data, key)) {
 			continue;
 		}
 
-		markers.set(key, buildMarker(data[key]));
+		id = `point_${key}`;
+		list.set(id, buildMarker(id, data[key]));
 	}
-
-	return markers;
 }
 
-export function buildMarker(data: Marker): LiveAtlasPointMarker {
+export function buildMarker(id: string, data: Marker): LiveAtlasPointMarker {
 	let dimensions;
 
 	if(data.dim) {
@@ -293,8 +305,8 @@ export function buildMarker(data: Marker): LiveAtlasPointMarker {
 	}
 
 	const marker = {
-		label: data.label || '',
-		isLabelHTML: data.markup || false,
+		id,
+		type: LiveAtlasMarkerType.POINT,
 		location: {
 			x: data.x || 0,
 			y: data.y || 0,
@@ -304,33 +316,41 @@ export function buildMarker(data: Marker): LiveAtlasPointMarker {
 		icon: data.icon || "default",
 		minZoom: typeof data.minzoom !== 'undefined' && data.minzoom > -1 ? data.minzoom : undefined,
 		maxZoom: typeof data.maxzoom !== 'undefined' && data.maxzoom > -1 ? data.maxzoom : undefined,
-		popupContent: data.desc || undefined,
-	};
+		tooltip: data.markup ? stripHTML(data.label) : data.label,
+		tooltipHTML: data.markup ? data.label : undefined,
+		popup: data.desc || undefined,
+		isPopupHTML: true,
+	} as LiveAtlasPointMarker;
 
 	//Fix double escaping on non-HTML labels
-	if(!marker.isLabelHTML) {
-		marker.label = decodeHTMLEntities(marker.label);
+	if(!marker.tooltipHTML) {
+		marker.tooltip = decodeHTMLEntities(marker.tooltip);
 	}
 
 	return marker;
 }
 
-export function buildAreas(data: any): Map<string, LiveAtlasAreaMarker> {
-	const areas = Object.freeze(new Map()) as Map<string, LiveAtlasAreaMarker>;
+export function buildAreas(data: any, list: Map<string, LiveAtlasMarker>): void {
+	let id;
 
 	for (const key in data) {
 		if (!Object.prototype.hasOwnProperty.call(data, key)) {
 			continue;
 		}
 
-		areas.set(key, buildArea(data[key]));
+		id = `area_${key}`;
+		list.set(id, buildArea(id, data[key]));
 	}
-
-	return areas;
 }
 
-export function buildArea(area: MarkerArea): LiveAtlasAreaMarker {
+export function buildArea(id: string, area: MarkerArea): LiveAtlasAreaMarker {
+	const x = area.x || [0, 0],
+		y = [area.ybottom || 0, area.ytop || 0] as [number, number],
+		z = area.z || [0, 0];
+
 	return {
+		id,
+		type: LiveAtlasMarkerType.AREA,
 		style: {
 			color: area.color || '#ff0000',
 			opacity: area.opacity || 1,
@@ -339,65 +359,73 @@ export function buildArea(area: MarkerArea): LiveAtlasAreaMarker {
 			fillOpacity: area.fillopacity || 0,
 		},
 		outline: !area.fillopacity,
-		points: getPoints(
-			area.x || [0, 0],
-			[area.ybottom || 0, area.ytop || 0],
-			area.z || [0, 0],
-			!area.fillopacity),
+		location: {x: getMiddle(x), y: getMiddle(y), z: getMiddle(z)},
+		points: getPoints(x, y, z, !area.fillopacity),
 		minZoom: typeof area.minzoom !== 'undefined' && area.minzoom > -1 ? area.minzoom : undefined,
 		maxZoom: typeof area.maxzoom !== 'undefined' && area.maxzoom > -1 ? area.maxzoom : undefined,
 
+		tooltip: area.markup ? stripHTML(area.label) : area.label,
+		tooltipHTML: area.markup ? area.label : undefined,
+		popup: area.desc || area.label || undefined,
 		isPopupHTML: area.desc ? true : area.markup || false,
-		popupContent: area.desc || area.label || undefined,
 	};
 }
 
-export function buildLines(data: any): Map<string, LiveAtlasLineMarker> {
-	const lines = Object.freeze(new Map()) as Map<string, LiveAtlasLineMarker>;
+export function buildLines(data: any, list: Map<string, LiveAtlasMarker>): void {
+	let id;
 
 	for (const key in data) {
 		if (!Object.prototype.hasOwnProperty.call(data, key)) {
 			continue;
 		}
 
-		lines.set(key, buildLine(data[key]));
+		id = `line_${key}`;
+		list.set(id, buildLine(id, data[key]));
 	}
-
-	return lines;
 }
 
-export function buildLine(line: MarkerLine): LiveAtlasLineMarker {
+export function buildLine(id: string, line: MarkerLine): LiveAtlasLineMarker {
+	const x = line.x || [0, 0],
+		y = line.y || [0, 0],
+		z = line.z || [0, 0];
+
 	return {
+		id,
+		type: LiveAtlasMarkerType.LINE,
 		style: {
 			color: line.color || '#ff0000',
 			opacity: line.opacity || 1,
 			weight: line.weight || 1,
 		},
-		points: getLinePoints(line.x || [0, 0], line.y || [0, 0], line.z || [0, 0]),
+		location: {x: getMiddle(x), y: getMiddle(y), z: getMiddle(z)},
+		points: getLinePoints(x, y, z),
 		minZoom: typeof line.minzoom !== 'undefined' && line.minzoom > -1 ? line.minzoom : undefined,
 		maxZoom: typeof line.maxzoom !== 'undefined' && line.maxzoom > -1 ? line.maxzoom : undefined,
 
+		tooltip: line.markup ? stripHTML(line.label) : line.label,
+		tooltipHTML: line.markup ? line.label : undefined,
+		popup: line.desc || line.label || undefined,
 		isPopupHTML: line.desc ? true : line.markup || false,
-		popupContent: line.desc || line.label || undefined,
 	};
 }
 
-export function buildCircles(data: any): Map<string, LiveAtlasCircleMarker> {
-	const circles = Object.freeze(new Map()) as Map<string, LiveAtlasCircleMarker>;
+export function buildCircles(data: any, list: Map<string, LiveAtlasMarker>): void {
+	let id;
 
 	for (const key in data) {
 		if (!Object.prototype.hasOwnProperty.call(data, key)) {
 			continue;
 		}
 
-		circles.set(key, buildCircle(data[key]));
+		id = `circle_${key}`;
+		list.set(id, buildCircle(id, data[key]));
 	}
-
-	return circles;
 }
 
-export function buildCircle(circle: MarkerCircle): LiveAtlasCircleMarker {
+export function buildCircle(id: string, circle: MarkerCircle): LiveAtlasCircleMarker {
 	return {
+		id,
+		type: LiveAtlasMarkerType.CIRCLE,
 		location: {
 			x: circle.x || 0,
 			y: circle.y || 0,
@@ -414,14 +442,17 @@ export function buildCircle(circle: MarkerCircle): LiveAtlasCircleMarker {
 		minZoom: typeof circle.minzoom !== 'undefined' && circle.minzoom > -1 ? circle.minzoom : undefined,
 		maxZoom: typeof circle.maxzoom !== 'undefined' && circle.maxzoom > -1 ? circle.maxzoom : undefined,
 
+		tooltip: circle.markup ? stripHTML(circle.label) : circle.label,
+		tooltipHTML: circle.markup ? circle.label : undefined,
+		popup: circle.desc || circle.label || undefined,
 		isPopupHTML: circle.desc ? true : circle.markup || false,
-		popupContent: circle.desc || circle.label || undefined,
 	};
 }
 
 export function buildUpdates(data: Array<any>, lastUpdate: Date) {
 	const updates = {
-			markerSets: new Map<string, DynmapMarkerSetUpdates>(),
+			markerSets: [] as DynmapMarkerSetUpdate[],
+			markers: [] as DynmapMarkerUpdate[],
 			tiles: [] as DynmapTileUpdate[],
 			chat: [] as LiveAtlasChat[],
 		},
@@ -463,39 +494,38 @@ export function buildUpdates(data: Array<any>, lastUpdate: Date) {
 					continue;
 				}
 
-				if (!updates.markerSets.has(set)) {
-					updates.markerSets.set(set, {
-						areaUpdates: [],
-						markerUpdates: [],
-						lineUpdates: [],
-						circleUpdates: [],
-						removed: false,
-					});
-				}
-
-				const markerSetUpdates = updates.markerSets.get(set),
-					update: DynmapUpdate = {
-						id: entry.id,
-						removed: entry.msg.endsWith('deleted'),
-					};
+				const update: any = {
+					id: entry.id,
+					removed: entry.msg.endsWith('deleted'),
+					set,
+				};
 
 				if (entry.msg.startsWith("set")) {
-					markerSetUpdates!.removed = update.removed;
-					markerSetUpdates!.payload = update.removed ? undefined : buildMarkerSet(set, entry);
-				} else if (entry.msg.startsWith("marker")) {
-					update.payload = update.removed ? undefined : buildMarker(entry);
-					markerSetUpdates!.markerUpdates.push(Object.freeze(update));
-				} else if (entry.msg.startsWith("area")) {
-					update.payload = update.removed ? undefined : buildArea(entry);
-					markerSetUpdates!.areaUpdates.push(Object.freeze(update));
+					if(!update.removed) {
+						update.payload = buildMarkerSet(set, entry);
+					}
 
-				} else if (entry.msg.startsWith("circle")) {
-					update.payload = update.removed ? undefined : buildCircle(entry);
-					markerSetUpdates!.circleUpdates.push(Object.freeze(update));
+					updates.markerSets.push(Object.freeze(update as DynmapMarkerSetUpdate));
+				} else {
+					if (entry.msg.startsWith("marker")) {
+						update.id = `point_${entry.id}`;
+						update.type = LiveAtlasMarkerType.POINT;
+						update.payload = update.removed ? undefined : buildMarker(update.id, entry);
+					} else if (entry.msg.startsWith("area")) {
+						update.id = `area_${entry.id}`;
+						update.type = LiveAtlasMarkerType.AREA;
+						update.payload = update.removed ? undefined : buildArea(update.id, entry);
+					} else if (entry.msg.startsWith("circle")) {
+						update.id = `circle_${entry.id}`;
+						update.type = LiveAtlasMarkerType.CIRCLE;
+						update.payload = update.removed ? undefined : buildCircle(update.id, entry);
+					} else if (entry.msg.startsWith("line")) {
+						update.id = `line_${entry.id}`;
+						update.type = LiveAtlasMarkerType.LINE;
+						update.payload = update.removed ? undefined : buildLine(update.id, entry);
+					}
 
-				} else if (entry.msg.startsWith("line")) {
-					update.payload = update.removed ? undefined : buildLine(entry);
-					markerSetUpdates!.lineUpdates.push(Object.freeze(update));
+					updates.markers.push(Object.freeze(update as DynmapMarkerUpdate));
 				}
 
 				accepted++;

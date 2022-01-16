@@ -22,6 +22,7 @@ import {CoordinatesControlOptions} from "@/leaflet/control/CoordinatesControl";
 import {ClockControlOptions} from "@/leaflet/control/ClockControl";
 import {LogoControlOptions} from "@/leaflet/control/LogoControl";
 import {globalMessages, serverMessages} from "../messages";
+import {LiveAtlasMarkerType} from "@/util/markers";
 
 declare module "*.png" {
    const value: any;
@@ -55,6 +56,11 @@ interface Coordinate {
 	x: number;
 	y: number;
 	z: number;
+}
+
+interface Coordinate2D {
+	x: number;
+	y: number;
 }
 
 interface LiveAtlasLocation {
@@ -98,7 +104,7 @@ interface LiveAtlasUIConfig {
 	compactPlayerMarkers: boolean;
 }
 
-export type LiveAtlasUIElement = 'layers' | 'chat' | 'players' | 'maps';
+export type LiveAtlasUIElement = 'layers' | 'chat' | LiveAtlasSidebarSection;
 export type LiveAtlasUIModal = 'login' | 'settings';
 export type LiveAtlasSidebarSection = 'servers' | 'players' | 'maps';
 export type LiveAtlasDimension = 'overworld' | 'nether' | 'end';
@@ -173,48 +179,43 @@ interface LiveAtlasMarkerSet {
 	showLabels?: boolean;
 }
 
-interface LiveAtlasMarkerSetContents {
-	points: Map<string, LiveAtlasPointMarker>,
-	areas: Map<string, LiveAtlasAreaMarker>;
-	lines: Map<string, LiveAtlasLineMarker>;
-	circles: Map<string, LiveAtlasCircleMarker>;
-}
-
-interface LiveAtlasPointMarker {
-	dimensions: PointTuple;
-	icon: string;
-	label: string;
-	isLabelHTML: boolean;
+interface LiveAtlasMarker {
+	id: string;
+	type: LiveAtlasMarkerType;
+	tooltip: string;
+	tooltipHTML?: string;
+	popup?: string;
+	isPopupHTML?: boolean;
 	location: Coordinate;
 	minZoom?: number;
 	maxZoom?: number;
-	popupContent?: string;
 }
 
-interface LiveAtlasPathMarker {
+interface LiveAtlasPointMarker extends LiveAtlasMarker {
+	type: LiveAtlasMarkerType.POINT;
+	dimensions: PointTuple;
+	icon: string;
+}
+
+interface LiveAtlasPathMarker extends LiveAtlasMarker {
 	style: PathOptions;
-	minZoom?: number;
-	maxZoom?: number;
-	popupContent?: string;
-	tooltipContent?: string;
-	isPopupHTML: boolean;
-}
-
-interface LiveAtlasAreaMarker extends LiveAtlasPathMarker {
-	style: PolylineOptions;
-	outline: boolean;
-	points: Coordinate[] | Coordinate[][] | Coordinate[][][]
 }
 
 interface LiveAtlasLineMarker extends LiveAtlasPathMarker {
+	type: LiveAtlasMarkerType.LINE;
 	points: Coordinate[];
 	style: PolylineOptions;
 }
 
+interface LiveAtlasAreaMarker extends LiveAtlasLineMarker {
+	type: LiveAtlasMarkerType.AREA;
+	outline: boolean;
+	points: Coordinate[] | Coordinate[][] | Coordinate[][][];
+}
+
 interface LiveAtlasCircleMarker extends LiveAtlasPathMarker {
-	location: Coordinate;
+	type: LiveAtlasMarkerType.CIRCLE;
 	radius: PointTuple;
-	style: PathOptions;
 }
 
 interface HeadQueueEntry {

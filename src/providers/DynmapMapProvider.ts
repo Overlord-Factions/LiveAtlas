@@ -15,8 +15,8 @@
  */
 
 import {
-	HeadQueueEntry,
-	LiveAtlasMarkerSet, LiveAtlasMarkerSetContents,
+	HeadQueueEntry, LiveAtlasMarker,
+	LiveAtlasMarkerSet,
 	LiveAtlasPlayer,
 	LiveAtlasServerDefinition,
 	LiveAtlasWorldDefinition
@@ -48,7 +48,7 @@ export default class DynmapMapProvider extends MapProvider {
 	private updateInterval: number = 3000;
 
 	private markerSets: Map<string, LiveAtlasMarkerSet> = new Map();
-	private markers = new Map<string, LiveAtlasMarkerSetContents>();
+	private markers = new Map<string, Map<string, LiveAtlasMarker>>();
 
 	constructor(config: LiveAtlasServerDefinition) {
 		super(config);
@@ -73,15 +73,16 @@ export default class DynmapMapProvider extends MapProvider {
 			}
 
 			const set: MarkerSet = response.sets[key],
-				markerSet = buildMarkerSet(key, set);
+				markerSet = buildMarkerSet(key, set),
+				markers = new Map<string, LiveAtlasMarker>();
+
+			buildMarkers(set.markers || {}, markers);
+			buildAreas(set.areas || {}, markers);
+			buildLines(set.lines || {}, markers);
+			buildCircles(set.circles || {}, markers);
 
 			this.markerSets.set(key, markerSet);
-			this.markers.set(key, Object.seal({
-				points: buildMarkers(set.markers || {}),
-				areas: buildAreas(set.areas || {}),
-				lines: buildLines(set.lines || {}),
-				circles: buildCircles(set.circles || {}),
-			}));
+			this.markers.set(key, markers);
 		}
 	}
 
@@ -183,6 +184,7 @@ export default class DynmapMapProvider extends MapProvider {
 
 		this.store.commit(MutationTypes.SET_WORLD_STATE, worldState);
 		this.store.commit(MutationTypes.ADD_MARKER_SET_UPDATES, updates.markerSets);
+		this.store.commit(MutationTypes.ADD_MARKER_UPDATES, updates.markers);
 		this.store.commit(MutationTypes.ADD_TILE_UPDATES, updates.tiles);
 		this.store.commit(MutationTypes.ADD_CHAT, updates.chat);
 

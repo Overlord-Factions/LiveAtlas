@@ -15,7 +15,7 @@
  */
 
 import {
-	DynmapMarkerSetUpdates,
+	DynmapMarkerUpdate,
 	DynmapTileUpdate
 } from "@/dynmap";
 import {
@@ -36,13 +36,15 @@ import {
 	LiveAtlasChat,
 	LiveAtlasUIModal,
 	LiveAtlasSidebarSectionState,
-	LiveAtlasMarkerSetContents
+	LiveAtlasMarker
 } from "@/index";
 import LiveAtlasMapDefinition from "@/model/LiveAtlasMapDefinition";
 import {getMessages} from "@/util";
 
 export type State = {
 	version: string;
+	firstLoad: boolean;
+
 	servers: Map<string, LiveAtlasServerDefinition>;
 	configuration: LiveAtlasServerConfig;
 	configurationHash: number | undefined;
@@ -64,7 +66,7 @@ export type State = {
 		messages: LiveAtlasChat[];
 	};
 
-	pendingSetUpdates: Map<string, DynmapMarkerSetUpdates>;
+	pendingMarkerUpdates: DynmapMarkerUpdate[];
 	pendingTileUpdates: Array<DynmapTileUpdate>;
 
 	followTarget?: LiveAtlasPlayer;
@@ -100,6 +102,7 @@ export type State = {
 
 export const state: State = {
 	version: (process.env.VITE_APP_VERSION || 'Unknown') as string,
+	firstLoad: true,
 	servers: new Map(),
 
 	configuration: {
@@ -131,7 +134,7 @@ export const state: State = {
 
 	markerSets: new Map(), //Markers sets from world_markers.json, doesn't include the markers themselves for performance reasons
 
-	pendingSetUpdates: new Map(), //Pending updates to markers/areas/etc for each marker set
+	pendingMarkerUpdates: [],  //Pending updates to markers/areas/etc for each marker set
 	pendingTileUpdates: [], //Pending updates to map tiles
 
 	//Dynmap optional components
@@ -217,5 +220,5 @@ export const state: State = {
 };
 
 export const nonReactiveState = Object.freeze({
-	markers: new Map<string, LiveAtlasMarkerSetContents>(),
+	markers: new Map<string, Map<string, LiveAtlasMarker>>(),
 });

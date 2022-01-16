@@ -17,6 +17,7 @@
 import {useStore} from "@/store";
 import LiveAtlasMapDefinition from "@/model/LiveAtlasMapDefinition";
 import {
+	Coordinate,
 	HeadQueueEntry,
 	LiveAtlasGlobalMessageConfig,
 	LiveAtlasMessageConfig,
@@ -26,7 +27,9 @@ import {
 import {notify} from "@kyvg/vue3-notification";
 import {globalMessages, serverMessages} from "../messages";
 
-const headCache = new Map<string, HTMLImageElement>(),
+const documentRange = document.createRange(),
+	brToSpaceRegex = /<br \/>/g,
+	headCache = new Map<string, HTMLImageElement>(),
 	headUnresolvedCache = new Map<string, Promise<HTMLImageElement>>(),
 	headsLoading = new Set<string>(),
 
@@ -188,10 +191,7 @@ const validateParsedUrl = (parsed: any) => {
 	return parsed;
 }
 
-export const getUrlForLocation = (map: LiveAtlasMapDefinition, location: {
-	x: number,
-	y: number,
-	z: number }, zoom: number): string => {
+export const getUrlForLocation = (map: LiveAtlasMapDefinition, location: Coordinate, zoom: number): string => {
 	const x = Math.round(location.x),
 			y = Math.round(location.y),
 			z = Math.round(location.z),
@@ -219,6 +219,10 @@ export const decodeHTMLEntities = (text: string) => {
 	return decodeTextarea.textContent || '';
 }
 
+export const stripHTML = (text: string) => {
+	return documentRange.createContextualFragment(text.replace(brToSpaceRegex,'&nbsp;')).textContent || '';
+}
+
 export const clipboardSuccess = () => () => notify(useStore().state.messages.copyToClipboardSuccess);
 
 export const clipboardError = () => (e: Error) => {
@@ -243,4 +247,31 @@ const _getMessages = (messageKeys: any, config: any = {}) => {
 	}
 
 	return messages as LiveAtlasGlobalMessageConfig;
+}
+
+export const getMiddle = (points: number[]) => {
+	const min = Math.min.apply(this, points),
+		max = Math.max.apply(this, points);
+
+	return min + ((max - min) / 2)
+}
+
+export const getMiddleFromPoints = (points: Coordinate[]): Coordinate => {
+	const min = {x: points[0].x, y: points[0].y, z: points[0].z},
+		max = {...min};
+
+	for (const point of points) {
+		min.x = Math.min(min.x, point.x);
+		max.x = Math.max(min.x, point.x);
+		min.y = Math.min(min.y, point.y);
+		max.y = Math.max(min.y, point.y);
+		min.z = Math.min(min.z, point.z);
+		max.z = Math.max(min.z, point.z);
+	}
+
+	return {
+		x: min.x + ((max.x - min.x) / 2),
+		y: min.y + ((max.y - min.y) / 2),
+		z: min.z + ((max.z - min.z) / 2),
+	}
 }

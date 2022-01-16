@@ -15,29 +15,20 @@
   -->
 
 <template>
-	<Areas :layer-group="layerGroup" :set="markerSet"></Areas>
-	<Circles :layer-group="layerGroup" :set="markerSet"></Circles>
-	<Lines :layer-group="layerGroup" :set="markerSet"></Lines>
 	<Markers :layer-group="layerGroup" :set="markerSet"></Markers>
 </template>
 
 <script lang="ts">
 import {defineComponent, computed, onMounted, onUnmounted} from "@vue/runtime-core";
 import {useStore} from "@/store";
-import Areas from "@/components/map/vector/Areas.vue";
-import Circles from "@/components/map/vector/Circles.vue";
-import Lines from "@/components/map/vector/Lines.vue";
-import Markers from "@/components/map/vector/Markers.vue";
 import LiveAtlasLeafletMap from "@/leaflet/LiveAtlasLeafletMap";
 import LiveAtlasLayerGroup from "@/leaflet/layer/LiveAtlasLayerGroup";
 import {LiveAtlasMarkerSet} from "@/index";
 import {watch} from "vue";
+import Markers from "@/components/map/marker/Markers.vue";
 
 export default defineComponent({
 	components: {
-		Areas,
-		Circles,
-		Lines,
 		Markers,
 	},
 

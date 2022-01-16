@@ -23,32 +23,42 @@ import LiveAtlasPolygon from "@/leaflet/vector/LiveAtlasPolygon";
 import {LiveAtlasCircleMarker} from "@/index";
 import {createPopup, tooltipOptions} from "@/util/paths";
 
-export const createCircle = (options: LiveAtlasCircleMarker, converter: Function): LiveAtlasPolyline | LiveAtlasPolygon => {
+export const createCircleLayer = (options: LiveAtlasCircleMarker, converter: Function): LiveAtlasPolyline | LiveAtlasPolygon => {
 	const outline = !options.style.fillOpacity || (options.style.fillOpacity <= 0),
 		points = getCirclePoints(options, converter, outline),
 		circle = outline ? new LiveAtlasPolyline(points, options) : new LiveAtlasPolygon(points, options);
 
-	if(options.popupContent) {
+	if(options.popup) {
 		circle.bindPopup(() => createPopup(options, 'CirclePopup'));
 	}
 
-	if (options.tooltipContent) {
-		circle.bindTooltip(() => options.tooltipContent as string, tooltipOptions);
+	if (options.tooltip) {
+		circle.bindTooltip(() => options.tooltipHTML || options.tooltip, tooltipOptions);
 	}
 
 	return circle;
 };
 
-export const updateCircle = (circle: LiveAtlasPolyline | LiveAtlasPolygon | undefined, options: LiveAtlasCircleMarker, converter: Function): LiveAtlasPolyline | LiveAtlasPolygon => {
+export const updateCircleLayer = (circle: LiveAtlasPolyline | LiveAtlasPolygon | undefined, options: LiveAtlasCircleMarker, converter: Function): LiveAtlasPolyline | LiveAtlasPolygon => {
 	if (!circle) {
-		return createCircle(options, converter);
+		return createCircleLayer(options, converter);
 	}
 
 	const outline = (options.style && options.style.fillOpacity && (options.style.fillOpacity <= 0)) as boolean;
 
 	circle.closePopup();
 	circle.unbindPopup();
-	circle.bindPopup(() => createPopup(options, 'CirclePopup'));
+	circle.closeTooltip();
+	circle.unbindTooltip();
+
+	if (options.popup) {
+		circle.bindPopup(() => createPopup(options, 'AreaPopup'));
+	}
+
+	if (options.tooltip) {
+		circle.bindTooltip(() => options.tooltipHTML || options.tooltip, tooltipOptions);
+	}
+
 	circle.setStyle(options.style);
 	circle.setLatLngs(getCirclePoints(options, converter, outline));
 	circle.redraw();

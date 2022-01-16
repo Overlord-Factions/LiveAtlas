@@ -17,24 +17,24 @@
 <template>
 	<section class="sidebar" role="none" ref="sidebar">
 		<header class="sidebar__buttons">
-			<button v-if="mapCount > 1 || serverCount > 1" :class="{'button--maps': true}" @click="toggleMaps"
+			<button v-if="mapCount > 1 || serverCount > 1" class="button--maps" data-section="maps"
 			        :title="mapCount > 1 ? messageWorlds : messageServers"
 			        :aria-label="mapCount > 1 ? messageWorlds : messageServers"
-			        :aria-expanded="mapsVisible" @keydown="handleMapsKeydown">
+			        :aria-expanded="mapsVisible"
+			        @click="handleSectionClick" @keydown="handleSectionKeydown">
 				<SvgIcon :name="mapCount > 1 ? 'maps' : 'servers'"></SvgIcon>
 			</button>
-			<button v-if="playerMakersEnabled" :class="{'button--players': true}" @click="togglePlayers"
+			<button v-if="playerMakersEnabled" class="button--players" data-section="players"
 			        :title="messagePlayers" :aria-label="messagePlayers" :aria-expanded="playersVisible"
-			        @keydown="handlePlayersKeydown">
+			        @click="handleSectionClick" @keydown="handleSectionKeydown">
 				<SvgIcon name="players"></SvgIcon>
 			</button>
 		</header>
 		<div class="sidebar__content" @keydown="handleSidebarKeydown">
-			<ServersSection v-if="serverCount > 1" v-show="mapsVisible"></ServersSection>
-			<WorldsSection v-if="mapCount > 1" v-show="mapsVisible"></WorldsSection>
-			<PlayersSection id="players" v-if="playerMakersEnabled && previouslyVisible.has('players')"
-			            v-show="playersVisible"></PlayersSection>
-			<FollowTargetSection v-if="following" v-show="followVisible" :target="following"></FollowTargetSection>
+			<ServersSection v-if="serverCount > 1" :hidden="!mapsVisible"></ServersSection>
+			<WorldsSection v-if="mapCount > 1" :hidden="!mapsVisible"></WorldsSection>
+			<PlayersSection v-if="playerMakersEnabled && previouslyVisible.has('players')" :hidden="!playersVisible"></PlayersSection>
+			<FollowTargetSection v-if="following" :hidden="!followVisible" :target="following"></FollowTargetSection>
 		</div>
 	</section>
 </template>
@@ -54,6 +54,7 @@ import "@/assets/icons/servers.svg";
 import {nextTick, ref, watch} from "vue";
 import {handleKeyboardEvent} from "@/util/events";
 import {focus} from "@/util";
+import {LiveAtlasSidebarSection} from "@/index";
 
 export default defineComponent({
 	components: {
@@ -68,6 +69,7 @@ export default defineComponent({
 		const store = useStore(),
 			sidebar = ref<HTMLElement | null>(null),
 
+			firstLoad = computed(() => store.state.firstLoad),
 			currentlyVisible = computed(() => store.state.ui.visibleElements),
 			previouslyVisible = computed(() => store.state.ui.previouslyVisibleElements),
 			smallScreen = computed(() => store.state.ui.smallScreen),
@@ -95,32 +97,41 @@ export default defineComponent({
 				return;
 			}
 
-			const sectionHeadings: HTMLElement[] = Array.from(sidebar.value!.querySelectorAll('.section__heading button'));
+			const sectionHeadings: HTMLElement[] = Array.from(sidebar.value!
+				.querySelectorAll('.sidebar__section:not([hidden]) .section__heading button'));
 			handleKeyboardEvent(e, sectionHeadings);
 		};
 
-		//Show sectinos on ArrowDown from button
-		const handleMapsKeydown = (e: KeyboardEvent) => {
-			if(e.key === 'ArrowDown') {
-				store.commit(MutationTypes.SET_UI_ELEMENT_VISIBILITY, {element: 'maps', state: true});
+		//Show sections on ArrowDown from button
+		const handleSectionKeydown = (e: KeyboardEvent) => {
+			const section = (e.target as HTMLElement).dataset.section as LiveAtlasSidebarSection;
+
+			if(e.key === 'ArrowDown' && section) {
+				if(currentlyVisible.value.has(section)) {
+					focusSection(section);
+				} else {
+					store.commit(MutationTypes.SET_UI_ELEMENT_VISIBILITY, {
+						element: section,
+						state: true
+					});
+				}
 			}
 		};
 
-		const handlePlayersKeydown = (e: KeyboardEvent) => {
-			if(e.key === 'ArrowDown') {
-				store.commit(MutationTypes.SET_UI_ELEMENT_VISIBILITY, {element: 'players', state: true});
-			}
-		};
+		const handleSectionClick = (e: MouseEvent) => {
+			const section = (e.target as HTMLElement).dataset.section as LiveAtlasSidebarSection;
 
-		const togglePlayers = () => store.commit(MutationTypes.TOGGLE_UI_ELEMENT_VISIBILITY, 'players');
-		const toggleMaps = () => store.commit(MutationTypes.TOGGLE_UI_ELEMENT_VISIBILITY, 'maps');
+			if(section) {
+				store.commit(MutationTypes.TOGGLE_UI_ELEMENT_VISIBILITY, section);
+			}
+		}
 
 		//Move focus when sidebar sections become visible
-		const focusMaps = () => focus('.section__heading button');
-		const focusPlayers = () => focus('#players-heading');
+		const focusSection = (section: LiveAtlasSidebarSection) => focus(`[data-section=${section}] .section__heading button`);
 
-		watch(playersVisible, newValue => newValue && nextTick(() => focusPlayers()));
-		watch(mapsVisible, newValue => newValue && nextTick(() => focusMaps()));
+		//Focus sidebar sections when they become visible, except on initial load
+		watch(playersVisible, newValue => newValue && !firstLoad.value && nextTick(() => focusSection('players')));
+		watch(mapsVisible, newValue => newValue && !firstLoad.value && nextTick(() => focusSection('maps')));
 
 		return {
 			sidebar,
@@ -140,11 +151,8 @@ export default defineComponent({
 			playerMakersEnabled,
 
 			handleSidebarKeydown,
-			handleMapsKeydown,
-			handlePlayersKeydown,
-
-			togglePlayers,
-			toggleMaps
+			handleSectionKeydown,
+			handleSectionClick,
 		}
 	},
 });
@@ -215,9 +223,10 @@ export default defineComponent({
 		pointer-events: auto;
 		margin-right: -0.5rem;
 		padding: 0.2rem 0.5rem 0 0.2rem;
-		width: 25rem;
+		width: 26rem;
         align-items: flex-end;
 		overscroll-behavior: contain;
+		will-change: transform;
 
 		&:not(:hover):not(:focus-within) {
 			scrollbar-color: var(--background-base) transparent;

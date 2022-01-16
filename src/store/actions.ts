@@ -19,12 +19,10 @@ import {ActionContext, ActionTree} from "vuex";
 import {State} from "@/store/state";
 import {ActionTypes} from "@/store/action-types";
 import {Mutations} from "@/store/mutations";
-import {
-	DynmapAreaUpdate, DynmapCircleUpdate, DynmapLineUpdate,
-	DynmapMarkerUpdate,
-	DynmapTileUpdate,
-} from "@/dynmap";
+import {DynmapMarkerUpdate, DynmapTileUpdate} from "@/dynmap";
 import {LiveAtlasMarkerSet, LiveAtlasPlayer, LiveAtlasWorldDefinition} from "@/index";
+import {nextTick} from "vue";
+import {startUpdateHandling, stopUpdateHandling} from "@/util/markers";
 
 type AugmentedActionContext = {
 	commit<K extends keyof Mutations>(
@@ -49,20 +47,8 @@ export interface Actions {
 	):Promise<Map<string, LiveAtlasMarkerSet>>
 	[ActionTypes.POP_MARKER_UPDATES](
 		{commit}: AugmentedActionContext,
-		payload: {markerSet: string, amount: number}
+		amount: number
 	): Promise<DynmapMarkerUpdate[]>
-	[ActionTypes.POP_AREA_UPDATES](
-		{commit}: AugmentedActionContext,
-		payload: {markerSet: string, amount: number}
-	): Promise<DynmapAreaUpdate[]>
-	[ActionTypes.POP_CIRCLE_UPDATES](
-		{commit}: AugmentedActionContext,
-		payload: {markerSet: string, amount: number}
-	): Promise<DynmapCircleUpdate[]>
-	[ActionTypes.POP_LINE_UPDATES](
-		{commit}: AugmentedActionContext,
-		payload: {markerSet: string, amount: number}
-	): Promise<DynmapLineUpdate[]>
 	[ActionTypes.POP_TILE_UPDATES](
 		{commit}: AugmentedActionContext,
 		payload: number
@@ -148,6 +134,8 @@ export const actions: ActionTree<State, State> & Actions = {
 				worldName, mapName
 			});
 		}
+
+		await nextTick(() => commit(MutationTypes.SET_LOADED, undefined));
 	},
 
 	async [ActionTypes.START_UPDATES]({state}) {
@@ -156,10 +144,12 @@ export const actions: ActionTree<State, State> & Actions = {
 		}
 
 		state.currentMapProvider!.startUpdates();
+		startUpdateHandling();
 	},
 
 	async [ActionTypes.STOP_UPDATES]({state}) {
 		state.currentMapProvider!.stopUpdates();
+		stopUpdateHandling();
 	},
 
 	[ActionTypes.SET_PLAYERS]({commit, state}, players: Set<LiveAtlasPlayer>) {
@@ -188,54 +178,10 @@ export const actions: ActionTree<State, State> & Actions = {
 		});
 	},
 
-	async [ActionTypes.POP_MARKER_UPDATES]({commit, state}, {markerSet, amount}: {markerSet: string, amount: number}): Promise<DynmapMarkerUpdate[]> {
-		if(!state.markerSets.has(markerSet)) {
-			console.warn(`POP_MARKER_UPDATES: Marker set ${markerSet} doesn't exist`);
-			return [];
-		}
+	async [ActionTypes.POP_MARKER_UPDATES]({commit, state}, amount: number): Promise<DynmapMarkerUpdate[]> {
+		const updates = state.pendingMarkerUpdates.slice(0, amount);
 
-		const updates = state.pendingSetUpdates.get(markerSet)!.markerUpdates.slice(0, amount);
-
-		commit(MutationTypes.POP_MARKER_UPDATES, {markerSet, amount});
-
-		return updates;
-	},
-
-	async [ActionTypes.POP_AREA_UPDATES]({commit, state}, {markerSet, amount}: {markerSet: string, amount: number}): Promise<DynmapAreaUpdate[]> {
-		if(!state.markerSets.has(markerSet)) {
-			console.warn(`POP_AREA_UPDATES: Marker set ${markerSet} doesn't exist`);
-			return [];
-		}
-
-		const updates = state.pendingSetUpdates.get(markerSet)!.areaUpdates.slice(0, amount);
-
-		commit(MutationTypes.POP_AREA_UPDATES, {markerSet, amount});
-
-		return updates;
-	},
-
-	async [ActionTypes.POP_CIRCLE_UPDATES]({commit, state}, {markerSet, amount}: {markerSet: string, amount: number}): Promise<DynmapCircleUpdate[]> {
-		if(!state.markerSets.has(markerSet)) {
-			console.warn(`POP_CIRCLE_UPDATES: Marker set ${markerSet} doesn't exist`);
-			return [];
-		}
-
-		const updates = state.pendingSetUpdates.get(markerSet)!.circleUpdates.slice(0, amount);
-
-		commit(MutationTypes.POP_CIRCLE_UPDATES, {markerSet, amount});
-
-		return updates;
-	},
-
-	async [ActionTypes.POP_LINE_UPDATES]({commit, state}, {markerSet, amount}: {markerSet: string, amount: number}): Promise<DynmapLineUpdate[]> {
-		if(!state.markerSets.has(markerSet)) {
-			console.warn(`POP_LINE_UPDATES: Marker set ${markerSet} doesn't exist`);
-			return [];
-		}
-
-		const updates = state.pendingSetUpdates.get(markerSet)!.lineUpdates.slice(0, amount);
-
-		commit(MutationTypes.POP_LINE_UPDATES, {markerSet, amount});
+		commit(MutationTypes.POP_MARKER_UPDATES, amount);
 
 		return updates;
 	},

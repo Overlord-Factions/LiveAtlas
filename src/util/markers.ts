@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 James Lyne
+ * Copyright 2022 James Lyne
  *
  * Some portions of this file were taken from https://github.com/webbukkit/dynmap.
  * These portions are Copyright 2020 Dynmap Contributors.
@@ -17,69 +17,116 @@
  * limitations under the License.
  */
 
-import {LeafletMouseEvent, Marker} from "leaflet";
-import {GenericIcon} from "@/leaflet/icon/GenericIcon";
+import {useStore} from "@/store";
+import {ActionTypes} from "@/store/action-types";
+import {DynmapMarkerUpdate} from "@/dynmap";
+import {computed, watch} from "@vue/runtime-core";
+import {ComputedRef} from "@vue/reactivity";
+import {
+	LiveAtlasAreaMarker,
+	LiveAtlasCircleMarker,
+	LiveAtlasLineMarker,
+	LiveAtlasMarker,
+	LiveAtlasPointMarker
+} from "@/index";
+import {Layer} from "leaflet";
+import {createCircleLayer, updateCircleLayer} from "@/util/circles";
+import {createPointLayer, updatePointLayer} from "@/util/points";
+import {createAreaLayer, updateAreaLayer} from "@/util/areas";
+import {createLineLayer, updateLineLayer} from "@/util/lines";
 import {GenericMarker} from "@/leaflet/marker/GenericMarker";
-import {LiveAtlasPointMarker} from "@/index";
+import LiveAtlasPolygon from "@/leaflet/vector/LiveAtlasPolygon";
+import LiveAtlasPolyline from "@/leaflet/vector/LiveAtlasPolyline";
 
-export const createMarker = (options: LiveAtlasPointMarker, converter: Function): Marker => {
-	const marker = new GenericMarker(converter(options.location), options);
+export type LiveAtlasMarkerUpdateCallback = ((update: DynmapMarkerUpdate) => void);
 
-	marker.on('click', (e: LeafletMouseEvent) => {
-		if(!e.target.getPopup() || e.target.isPopupOpen()) {
-			e.target._map.panTo(e.target.getLatLng());
+export enum LiveAtlasMarkerType {
+	POINT,
+	AREA,
+	LINE,
+	CIRCLE
+}
+
+let updateFrame = 0;
+let pendingUpdates: ComputedRef;
+
+const updateHandlers: { [key:string]: Set<LiveAtlasMarkerUpdateCallback>} = {};
+
+export const startUpdateHandling = () => {
+	const store = useStore();
+
+	pendingUpdates = computed(() => store.state.pendingMarkerUpdates.length);
+
+	watch(pendingUpdates, (newValue, oldValue) => {
+		if(newValue && newValue > 0 && oldValue === 0 && !updateFrame) {
+			updateFrame = requestAnimationFrame(() => handlePendingUpdates());
 		}
 	});
+}
 
-	if(options.popupContent) {
-		marker.bindPopup(() => createPopup(options));
+export const stopUpdateHandling = () => {
+	if(updateFrame) {
+		cancelAnimationFrame(updateFrame);
+		updateFrame = 0;
+	}
+}
+
+export const registerUpdateHandler = (callback: LiveAtlasMarkerUpdateCallback, set: string) => {
+	if(!updateHandlers[set]) {
+		updateHandlers[set] = new Set();
 	}
 
-	return marker;
-};
+	updateHandlers[set].add(callback);
+}
 
-export const updateMarker = (marker: Marker | undefined, options: LiveAtlasPointMarker, converter: Function): Marker => {
-	if (!marker) {
-		return createMarker(options, converter);
+export const unregisterUpdateHandler = (callback: LiveAtlasMarkerUpdateCallback, set: string) => {
+	if(!updateHandlers[set]) {
+		return;
 	}
 
-	const oldLocation = marker.getLatLng(),
-		newLocation = converter(options.location);
+	updateHandlers[set].delete(callback);
+}
 
-	if(!oldLocation.equals(newLocation)) {
-		marker.setLatLng(newLocation);
-	}
+const handlePendingUpdates = async () => {
+	const store = useStore(),
+		updates = await store.dispatch(ActionTypes.POP_MARKER_UPDATES, 10);
 
-	if(marker instanceof GenericMarker) {
-		const icon = marker.getIcon();
-
-		if(icon && icon instanceof GenericIcon) {
-			icon.update({
-				icon: options.icon,
-				label: options.label,
-				iconSize: options.dimensions,
-				isHtml: options.isLabelHTML,
-			});
+	for(const update of updates) {
+		if(updateHandlers[update.set]) {
+			updateHandlers[update.set].forEach(callback => callback(update));
 		}
 	}
 
-	marker.closePopup();
-	marker.unbindPopup();
-
-	if(options.popupContent) {
-		marker.bindPopup(() => createPopup(options));
+	if(pendingUpdates.value) {
+		// eslint-disable-next-line no-unused-vars
+		updateFrame = requestAnimationFrame(() => handlePendingUpdates());
+	} else {
+		updateFrame = 0;
 	}
-
-	return marker;
 };
 
-const createPopup = (options: LiveAtlasPointMarker) => {
-	const popup = document.createElement('span');
-
-	if (options.popupContent) {
-		popup.classList.add('MarkerPopup');
-		popup.insertAdjacentHTML('afterbegin', options.popupContent);
+export const createMarkerLayer = (options: LiveAtlasMarker, converter: Function): Layer => {
+	switch(options.type) {
+		case LiveAtlasMarkerType.POINT:
+			return createPointLayer(options as LiveAtlasPointMarker, converter);
+		case LiveAtlasMarkerType.AREA:
+			return createAreaLayer(options as LiveAtlasAreaMarker, converter);
+		case LiveAtlasMarkerType.LINE:
+			return createLineLayer(options as LiveAtlasLineMarker, converter);
+		case LiveAtlasMarkerType.CIRCLE:
+			return createCircleLayer(options as LiveAtlasCircleMarker, converter);
 	}
+}
 
-	return popup;
+export const updateMarkerLayer = (marker: Layer | undefined, options: LiveAtlasMarker, converter: Function): Layer => {
+	switch(options.type) {
+		case LiveAtlasMarkerType.POINT:
+			return updatePointLayer(marker as GenericMarker, options as LiveAtlasPointMarker, converter);
+		case LiveAtlasMarkerType.AREA:
+			return updateAreaLayer(marker as LiveAtlasPolygon | LiveAtlasPolyline, options as LiveAtlasAreaMarker, converter);
+		case LiveAtlasMarkerType.LINE:
+			return updateLineLayer(marker as LiveAtlasPolyline, options as LiveAtlasLineMarker, converter);
+		case LiveAtlasMarkerType.CIRCLE:
+			return updateCircleLayer(marker as LiveAtlasPolyline | LiveAtlasPolygon, options as LiveAtlasCircleMarker, converter);
+	}
 }

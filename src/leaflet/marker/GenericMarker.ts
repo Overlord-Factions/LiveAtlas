@@ -32,9 +32,9 @@ export class GenericMarker extends Marker {
 
 		this.options.icon = new GenericIcon({
 			icon: options.icon,
-			label: options.label,
+			label: options.tooltipHTML || options.tooltip,
 			iconSize: options.dimensions,
-			isHtml: options.isLabelHTML,
+			isHtml: !!options.tooltipHTML,
 		});
 
 		this.options.maxZoom = options.maxZoom;
