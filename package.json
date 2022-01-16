@@ -17,6 +17,7 @@
   "dependencies": {
     "@kyvg/vue3-notification": "2.3.0",
     "@soerenmartius/vue3-clipboard": "^0.1",
+    "git-rev-sync": "^3.0.1",
     "leaflet": "git+https://github.com/JLyne/leaflet.git",
     "modern-normalize": "^1.1.0",
     "vue": "^3.2.21",

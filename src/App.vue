@@ -69,6 +69,8 @@ export default defineComponent({
 			loadingAttempts = ref(0),
 
 			loadConfiguration = async () => {
+			// fetch the commit
+			
 				try {
 					clearTimeout(Number(loadingTimeout));
 					showSplash(!loadingAttempts.value);
@@ -91,7 +93,6 @@ export default defineComponent({
 					if(!(e instanceof DOMException && e.name === 'AbortError') && !loginRequired.value) {
 						var error = `Failed to load the server map`;
 						showSplashError(`${error}\n${e}`, false, ++loadingAttempts.value);
-
 						clearTimeout(Number(loadingTimeout));
 						if(loadingAttempts.value >= 20) {
 						  showSplashError(`${error}\n${e}\nMaximum attempts reached, refresh the page`, false, loadingAttempts.value);
