@@ -15,48 +15,47 @@
   -->
 
 <template>
-	<SidebarSection name="players" class="players">
-		<template v-slot:heading>{{ messageHeading }}</template>
+	<SidebarSection v-if="markerSets.size" name="markers" class="markers">
+		<template v-slot:heading>{{ heading }}</template>
 		<template v-slot:default>
-			<PlayerList :players="players" :search="searchEnabled" aria-labelledby="players-heading">
-			</PlayerList>
+			<MarkerSetList :markerSets="markerSets" aria-labelledby="markers-heading"></MarkerSetList>
 		</template>
 	</SidebarSection>
 </template>
 
 <script lang="ts">
-import {computed, defineComponent} from "@vue/runtime-core";
+import {computed, defineComponent} from 'vue';
 import {useStore} from "@/store";
 import SidebarSection from "@/components/sidebar/SidebarSection.vue";
-import PlayerList from "@/components/list/PlayerList.vue";
+import MarkerSetList from "@/components/list/MarkerSetList.vue";
 
 export default defineComponent({
+	name: 'MarkersSection',
 	components: {
-		PlayerList,
+		MarkerSetList,
 		SidebarSection,
 	},
 
 	setup() {
 		const store = useStore(),
-			messageHeading = computed(() => store.getters.playersHeading),
-
-			searchEnabled = computed(() => store.state.ui.playersSearch),
-
-			players = computed(() => store.state.sortedPlayers),
-			maxPlayers = computed(() => store.state.maxPlayers || 0);
+			heading = computed(() => store.state.messages.markersHeading),
+			markerSets = computed(() => store.state.markerSets);
 
 		return {
-			messageHeading,
-			searchEnabled,
-			players,
-			maxPlayers
+			heading,
+			markerSets
 		}
 	}
 });
 </script>
 
 <style lang="scss" scoped>
-	::v-deep(.menu) {
-		scroll-margin-top: 8.2rem;
+	::v-deep(.menu), ::v-deep(.menu input) {
+		scroll-margin-top: 14.4rem;
+		scroll-margin-bottom: 6.5rem;
+	}
+
+	::v-deep(.section__search) {
+		top: 9rem;
 	}
 </style>

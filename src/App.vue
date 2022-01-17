@@ -148,6 +148,9 @@ export default defineComponent({
 					case 'M':
 						element = 'maps';
 						break;
+					case 'I':
+						element = 'markers';
+						break;
 					case 'C':
 						element = 'chat';
 						break;
