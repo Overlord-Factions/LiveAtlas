@@ -40,7 +40,7 @@ import {
 	LiveAtlasUIModal,
 	LiveAtlasSidebarSectionState, LiveAtlasMarker, LiveAtlasMapViewTarget
 } from "@/index";
-import {getGlobalMessages} from "@/util";
+import {getDefaultMinecraftHead, getGlobalMessages} from "@/util";
 import {getServerMapProvider} from "@/util/config";
 
 export type CurrentMapPayload = {
@@ -169,7 +169,7 @@ export const mutations: MutationTree<State> & Mutations = {
 
 		worlds.forEach(world => {
 			state.worlds.set(world.name, world);
-			world.maps.forEach(map => state.maps.set([world.name, map.name].join('_'), map));
+			world.maps.forEach(map => state.maps.set(`${map.world.name}_${map.name}`, map));
 		});
 
 		//Update current world if a world with the same name still exists, otherwise clear
@@ -180,8 +180,8 @@ export const mutations: MutationTree<State> & Mutations = {
 		}
 
 		//Update current map if a map with the same name still exists, otherwise clear
-		if(state.currentWorld && state.currentMap && state.maps.has([state.currentWorld.name, state.currentMap.name].join('_'))) {
-			state.currentMap = state.maps.get([state.currentWorld.name, state.currentMap.name].join('_'));
+		if(state.currentWorld && state.currentMap && state.maps.has(`${state.currentWorld.name}_${state.currentMap.name}`)) {
+			state.currentMap = state.maps.get(`${state.currentWorld.name}_${state.currentMap.name}`);
 		} else {
 			state.currentMap = undefined;
 		}
@@ -388,7 +388,7 @@ export const mutations: MutationTree<State> & Mutations = {
 
 	//Sets the currently active map/world
 	[MutationTypes.SET_CURRENT_MAP](state: State, {worldName, mapName}) {
-		mapName = [worldName, mapName].join('_');
+		mapName = `${worldName}_${mapName}`;
 
 		if(!state.worlds.has(worldName)) {
 			throw new RangeError(`Unknown world ${worldName}`);
@@ -551,7 +551,12 @@ export const mutations: MutationTree<State> & Mutations = {
 		state.configuration.title = '';
 
 		state.components.markers.showLabels= false;
-		state.components.playerMarkers = undefined;
+		state.components.players = {
+			markers: undefined,
+			showImages: true,
+			grayHiddenPlayers: true,
+			imageUrl: getDefaultMinecraftHead,
+		};
 		state.components.coordinatesControl = undefined;
 		state.components.clockControl = undefined;
 		state.components.linkControl = false;

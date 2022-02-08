@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import {DynmapMarkerSetUpdate, DynmapMarkerUpdate, DynmapTileUpdate} from "@/dynmap";
+import {DynmapMarkerSetUpdate, DynmapMarkerUpdate, DynmapTileUpdate, DynmapUrlConfig} from "@/dynmap";
 import {
 	LiveAtlasAreaMarker,
 	LiveAtlasChat,
@@ -31,7 +31,7 @@ import {
 import {getPoints} from "@/util/areas";
 import {
 	decodeHTMLEntities,
-	endWorldNameRegex, getBounds,
+	endWorldNameRegex, getBounds, getImagePixelSize,
 	getMiddle,
 	netherWorldNameRegex,
 	stripHTML,
@@ -110,7 +110,7 @@ export function buildWorlds(response: Configuration): Array<LiveAtlasWorldDefini
 				y: world.center.y || 0,
 				z: world.center.z || 0
 			},
-			maps: new Map(),
+			maps: new Set(),
 		});
 	});
 
@@ -126,8 +126,11 @@ export function buildWorlds(response: Configuration): Array<LiveAtlasWorldDefini
 				return;
 			}
 
-			assignedWorld.maps.set(map.name, Object.freeze(new LiveAtlasMapDefinition({
-				world: actualWorld, //Ignore append_to_world here for Dynmap URL parity
+			// Maps with append_to_world set are added both the original and target world's map set
+			// The world property is always the original world, an additional appendedWorld property contains the target world
+			const mapDef = Object.freeze(new LiveAtlasMapDefinition({
+				world: actualWorld,
+				appendedWorld: actualWorld !== assignedWorld ? assignedWorld : undefined,
 				background: map.background || '#000000',
 				backgroundDay: map.backgroundday || '#000000',
 				backgroundNight: map.backgroundnight || '#000000',
@@ -141,22 +144,39 @@ export function buildWorlds(response: Configuration): Array<LiveAtlasWorldDefini
 				worldToMap: map.worldtomap || undefined,
 				nativeZoomLevels: map.mapzoomout || 1,
 				extraZoomLevels: map.mapzoomin || 0
-			})));
+			})) as LiveAtlasMapDefinition;
+
+			actualWorld.maps.add(mapDef);
+
+			if(actualWorld !== assignedWorld) {
+				assignedWorld.maps.add(mapDef);
+			}
 		});
 	});
 
 	return Array.from(worlds.values());
 }
 
-export function buildComponents(response: Configuration): LiveAtlasComponentConfig {
+export function buildComponents(response: Configuration, config: DynmapUrlConfig): LiveAtlasComponentConfig {
 	const components: LiveAtlasComponentConfig = {
 		markers: {
 			showLabels: false,
 		},
 		chatBox: undefined,
 		chatBalloons: false,
-		playerMarkers: undefined,
-		playerList: {
+		players: {
+			markers: undefined,
+			grayHiddenPlayers: false,
+			imageUrl: entry => {
+				const baseUrl = `${config.markers}faces/`;
+
+				if(entry.size === 'body') {
+					return `${baseUrl}body/${entry.name}.png`;
+				}
+
+				const pixels = getImagePixelSize(entry.size);
+				return `${baseUrl}${pixels}x${pixels}/${entry.name}.png`;
+			},
 			showImages: response.showplayerfacesinmenu || false,
 		},
 		coordinatesControl: undefined,
@@ -188,8 +208,8 @@ export function buildComponents(response: Configuration): LiveAtlasComponentConf
 					imageSize = 'body';
 				}
 
-				components.playerMarkers = {
-					grayHiddenPlayers: response.grayplayerswhenhidden || false,
+				components.players.grayHiddenPlayers = response.grayplayerswhenhidden || false;
+				components.players.markers = {
 					hideByDefault: component.hidebydefault || false,
 					layerName: component.label || "Players",
 					layerPriority: component.layerprio || 0,

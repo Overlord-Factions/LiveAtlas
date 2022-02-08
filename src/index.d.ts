@@ -156,7 +156,7 @@ interface LiveAtlasWorldDefinition {
 	dimension: LiveAtlasDimension;
 	center: Coordinate;
 	defaultZoom?: number;
-	maps: Map<string, LiveAtlasMapDefinition>;
+	maps: Set<LiveAtlasMapDefinition>;
 }
 
 interface LiveAtlasWorldState {
@@ -184,7 +184,6 @@ interface LiveAtlasMapProvider {
 	logout(): void;
 	register(formData: FormData): void;
 
-	getPlayerHeadUrl(entry: HeadQueueEntry): string;
 	getTilesUrl(): string;
 	getMarkerIconUrl(icon: string): string;
 }
@@ -261,10 +260,12 @@ interface LiveAtlasComponentConfig {
 	markers: {
 		showLabels: boolean;
 	};
-	playerMarkers?: LiveAtlasPlayerMarkerConfig;
-	playerList: {
+	players: {
+		markers?: LiveAtlasPlayerMarkerConfig;
 		showImages: boolean;
-	},
+		grayHiddenPlayers: boolean;
+		imageUrl: (entry: HeadQueueEntry) => string;
+	};
 	coordinatesControl?: CoordinatesControlOptions;
 	clockControl?: ClockControlOptions;
 	linkControl: boolean;
@@ -280,7 +281,12 @@ interface LiveAtlasPartialComponentConfig {
 	markers?: {
 		showLabels: boolean;
 	};
-	playerMarkers?: LiveAtlasPlayerMarkerConfig;
+	players?: {
+		markers?: LiveAtlasPlayerMarkerConfig;
+		showImages?: boolean;
+		grayHiddenPlayers?: boolean;
+		imageUrl?: (entry: HeadQueueEntry) => string;
+	};
 	coordinatesControl?: CoordinatesControlOptions;
 	clockControl?: ClockControlOptions;
 	linkControl?: boolean;
@@ -293,7 +299,6 @@ interface LiveAtlasPartialComponentConfig {
 }
 
 interface LiveAtlasPlayerMarkerConfig {
-	grayHiddenPlayers: boolean;
 	hideByDefault: boolean;
 	layerName: string;
 	layerPriority: number;

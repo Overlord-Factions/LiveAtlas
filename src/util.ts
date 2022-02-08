@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+import defaultImage from '@/assets/images/player_face.png';
 import {useStore} from "@/store";
 import LiveAtlasMapDefinition from "@/model/LiveAtlasMapDefinition";
 import {
@@ -113,6 +114,10 @@ export const getMinecraftHead = (player: LiveAtlasPlayer | string, size: LiveAtl
 	return promise;
 }
 
+export const getDefaultMinecraftHead = () => {
+	return defaultImage;
+}
+
 const tickHeadQueue = () => {
 	if(headsLoading.size > 8 || !headQueue.length) {
 		return;
@@ -121,7 +126,7 @@ const tickHeadQueue = () => {
 	const head = headQueue.pop() as HeadQueueEntry;
 
 	headsLoading.add(head.cacheKey);
-	head.image.src = useStore().state.currentMapProvider!.getPlayerHeadUrl(head);
+	head.image.src = useStore().state.components.players.imageUrl(head);
 
 	tickHeadQueue();
 }
@@ -263,18 +268,24 @@ export const getBounds = (x: number[], y: number[], z: number[]): LiveAtlasBound
 
 export const getBoundsFromPoints = (points: Coordinate[]): LiveAtlasBounds => {
 	const bounds = {
-		max: {...points[0]},
-		min: {...points[0]},
+		max: {x: -Infinity, y: -Infinity, z: -Infinity},
+		min: {x: Infinity, y: Infinity, z: Infinity},
 	}
 
-	for (const point of points) {
-		bounds.max.x = Math.max(point.x, bounds.max.x);
-		bounds.max.y = Math.max(point.y, bounds.max.y);
-		bounds.max.z = Math.max(point.z, bounds.max.z);
-		bounds.min.x = Math.min(point.x, bounds.min.x);
-		bounds.min.y = Math.min(point.y, bounds.min.y);
-		bounds.min.z = Math.min(point.z, bounds.min.z);
+	const handlePoint = (point: any) => {
+		if(Array.isArray(point)) {
+			point.map(handlePoint);
+		} else {
+			bounds.max.x = Math.max(point.x, bounds.max.x);
+			bounds.max.y = Math.max(point.y, bounds.max.y);
+			bounds.max.z = Math.max(point.z, bounds.max.z);
+			bounds.min.x = Math.min(point.x, bounds.min.x);
+			bounds.min.y = Math.min(point.y, bounds.min.y);
+			bounds.min.z = Math.min(point.z, bounds.min.z);
+		}
 	}
+
+	points.map(handlePoint);
 
 	return bounds;
 }

@@ -15,7 +15,6 @@
  */
 
 import {
-	HeadQueueEntry,
 	LiveAtlasAreaMarker,
 	LiveAtlasCircleMarker,
 	LiveAtlasComponentConfig,
@@ -33,7 +32,7 @@ import LiveAtlasMapDefinition from "@/model/LiveAtlasMapDefinition";
 import {MutationTypes} from "@/store/mutation-types";
 import MapProvider from "@/providers/MapProvider";
 import {ActionTypes} from "@/store/action-types";
-import {getBoundsFromPoints, getMiddle, stripHTML, titleColoursRegex} from "@/util";
+import {getBoundsFromPoints, getDefaultMinecraftHead, getMiddle, stripHTML, titleColoursRegex} from "@/util";
 import {LiveAtlasMarkerType} from "@/util/markers";
 import {PointTuple} from "leaflet";
 import ConfigurationError from "@/errors/ConfigurationError";
@@ -118,7 +117,14 @@ export default class Pl3xmapMapProvider extends MapProvider {
 		filteredWorlds.forEach((world: any, index: number) => {
 			const worldResponse = worldResponses[index],
 				worldConfig: {components: LiveAtlasPartialComponentConfig } = {
-					components: {},
+					components: {
+						players: {
+							markers: undefined,
+							imageUrl: getDefaultMinecraftHead,
+							grayHiddenPlayers: true,
+							showImages: true,
+						}
+					},
 				};
 
 			this.worldMarkerUpdateIntervals.set(world.name, worldResponse.marker_update_interval || 3000);
@@ -131,8 +137,12 @@ export default class Pl3xmapMapProvider extends MapProvider {
 
 				this.worldPlayerUpdateIntervals.set(world.name, updateInterval);
 
-				worldConfig.components.playerMarkers = {
-					grayHiddenPlayers: true,
+				if(worldResponse.player_tracker?.nameplates?.heads_url) {
+					worldConfig.components.players!.imageUrl = entry =>
+						worldResponse.player_tracker.nameplates.heads_url.replace('{uuid}', entry.uuid);
+				}
+
+				worldConfig.components.players!.markers = {
 					hideByDefault: !!worldResponse.player_tracker?.default_hidden,
 					layerName: worldResponse.player_tracker?.label || '',
 					layerPriority: worldResponse.player_tracker?.priority,
@@ -141,8 +151,6 @@ export default class Pl3xmapMapProvider extends MapProvider {
 					showArmor: armor,
 					showYaw: true,
 				}
-			} else {
-				worldConfig.components.playerMarkers = undefined;
 			}
 
 			this.worldComponents.set(world.name, worldConfig);
@@ -160,7 +168,7 @@ export default class Pl3xmapMapProvider extends MapProvider {
 				dimension = 'end';
 			}
 
-			const maps: Map<string, LiveAtlasMapDefinition> = new Map();
+			const maps: Set<LiveAtlasMapDefinition> = new Set();
 
 			const w = {
 				name: world.name || '(Unnamed world)',
@@ -172,7 +180,7 @@ export default class Pl3xmapMapProvider extends MapProvider {
 				maps,
 			};
 
-			maps.set('flat', Object.freeze(new LiveAtlasMapDefinition({
+			maps.add(Object.freeze(new LiveAtlasMapDefinition({
 				world: w,
 
 				background: 'transparent',
@@ -200,15 +208,18 @@ export default class Pl3xmapMapProvider extends MapProvider {
 			linkControl: !!response.ui?.link?.enabled,
 			layerControl: !!response.ui?.coordinates?.enabled,
 
-			//Configured per-world
-			playerMarkers: undefined,
+			players: {
+				markers: undefined, //Configured per-world
+				imageUrl: getDefaultMinecraftHead,
+
+				//Not configurable
+				showImages: true,
+				grayHiddenPlayers: true,
+			},
 
 			//Not configurable
 			markers: {
 				showLabels: false,
-			},
-			playerList: {
-				showImages: true,
 			},
 
 			//Not used by pl3xmap
@@ -536,7 +547,7 @@ export default class Pl3xmapMapProvider extends MapProvider {
 
 	private async updatePlayers() {
 		try {
-			if(this.store.state.components.playerMarkers) {
+			if(this.store.getters.playerMarkersEnabled) {
 				const players = await this.getPlayers();
 
 				this.playerUpdateTimestamp = new Date();
@@ -587,11 +598,6 @@ export default class Pl3xmapMapProvider extends MapProvider {
 
     getTilesUrl(): string {
         return `${this.config}tiles/`;
-    }
-
-	getPlayerHeadUrl(head: HeadQueueEntry): string {
-		//TODO: Listen to config
-        return 'https://mc-heads.net/avatar/{uuid}/16'.replace('{uuid}', head.uuid || '');
     }
 
     getMarkerIconUrl(icon: string): string {
